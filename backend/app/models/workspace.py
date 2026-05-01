@@ -1,0 +1,42 @@
+from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.enums import WorkspaceRole, enum_values
+
+
+class Workspace(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "workspaces"
+
+    name: Mapped[str] = mapped_column(String(180), index=True)
+    slug: Mapped[str] = mapped_column(String(180), unique=True, index=True)
+
+    members = relationship(
+        "WorkspaceMember",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+
+
+class WorkspaceMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "workspace_members"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member_user"),
+    )
+
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[WorkspaceRole] = mapped_column(
+        Enum(WorkspaceRole, values_callable=enum_values, native_enum=False),
+        default=WorkspaceRole.MEMBER,
+        nullable=False,
+        index=True,
+    )
+
+    workspace = relationship("Workspace", back_populates="members")
+    user = relationship("User", back_populates="memberships")
